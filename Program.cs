@@ -9,6 +9,10 @@ using DevCycle.SDK.Server.Cloud.Api;
 using DevCycle.SDK.Server.Common.Model;
 using OpenFeature;
 using OpenFeature.Model;
+using FeatBit.Sdk.Server;
+using FeatBit.Sdk.Server.Model;
+using FeatBit.Sdk.Server.Options;
+
 
 internal class Program
 {
@@ -18,9 +22,10 @@ internal class Program
     {
         const int refreshSeconds = 10;
 
-        User user = new User
+        //create a local user object to convert to context in SDKs
+        User user = new User 
         {
-            Email = "harry@example.com",
+            Email = "jane@example.com",
             TenantId = 47223,
             Country = "Italy",
             Role = "PolicyAdmin"
@@ -33,6 +38,15 @@ internal class Program
                 .Build();
         DevCycleUser dcuser = new DevCycleUser(user.Email);
         // END DevCyle
+
+        // START FeatBit
+        var options = new FbOptionsBuilder(ReadKey("FEAT_BIT_KEY"))
+            .Event(new Uri("https://featbit-tio-eu-eval.azurewebsites.net"))
+            .Streaming(new Uri("wss://featbit-tio-eu-eval.azurewebsites.net"))
+            .Build();
+        var fbclient = new FbClient(options);
+        var fbuser = FbUser.Builder(user.Email).Build();
+        // END FeatBit
 
         // START OpenFeature
         OpenFeature.Api.Instance.SetProvider(dcclient.GetOpenFeatureProvider());
@@ -114,11 +128,17 @@ internal class Program
             sw.Stop();
             Console.WriteLine($"retrieved {ff_key} value from DevCycle in {sw.ElapsedMilliseconds} ms: " + dc_feat);
 
+            // FeatBit
+            sw = Stopwatch.StartNew();
+            var fb_feat = fbclient.BoolVariation(ff_key, fbuser, defaultValue: false);
+            sw.Stop();
+            Console.WriteLine($"retrieved {ff_key} value from FeatBit in {sw.ElapsedMilliseconds} ms: " + fb_feat);
+
             // OpenFeature - DevCyle
              sw = Stopwatch.StartNew();
             var of_dc_feat = await oFeatClient.GetBooleanValue(ff_key, false, ofctx);
             sw.Stop();
-            Console.WriteLine($"retrieved {ff_key} value from OpenFeature-DevCycle in {sw.ElapsedMilliseconds} ms: " + of_dc_feat);
+            Console.WriteLine($"retrieved {ff_key} value from OpenFeature-{"DevCycle"} in {sw.ElapsedMilliseconds} ms: " + of_dc_feat);
 
             // LaunchDarkly
             sw = Stopwatch.StartNew();

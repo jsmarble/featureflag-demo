@@ -11,9 +11,14 @@
   <ItemGroup>
     <PackageReference Include="ConfigCat.Client" Version="9.0.1" />
     <PackageReference Include="DevCycle.SDK.Server.Cloud" Version="3.0.4" />
+    <PackageReference Include="FeatBit.ServerSdk" Version="1.1.5" />
     <PackageReference Include="Flagsmith" Version="5.2.2" />
     <PackageReference Include="LaunchDarkly.ServerSdk" Version="8.0.0" />
     <PackageReference Include="OpenFeature" Version="1.4.1" />
   </ItemGroup>
+
+  <Target Name="CopySecretsEnv" AfterTargets="AfterBuild">
+    <Copy SourceFiles="secrets.env" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
