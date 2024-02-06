@@ -1,11 +1,14 @@
 using System.Linq;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using ConfigCat.Client;
 using LaunchDarkly.Sdk;
 using LaunchDarkly.Sdk.Server;
 using Flagsmith;
 using DevCycle.SDK.Server.Cloud.Api;
 using DevCycle.SDK.Server.Common.Model;
+using OpenFeature;
+using OpenFeature.Model;
 
 internal class Program
 {
@@ -23,14 +26,24 @@ internal class Program
             Role = "PolicyAdmin"
         };
 
-        // START OpenFeature
-
-        // END OpenFeature
-
         // START DevCycle
-        string devcycKey = ReadKey("DEV_CYCLE_KEY");
-
+        using DevCycleCloudClient dcclient = new DevCycleCloudClientBuilder()
+                .SetSDKKey(ReadKey("DEV_CYCLE_KEY"))
+                .SetLogger(new NullLoggerFactory())
+                .Build();
+        DevCycleUser dcuser = new DevCycleUser(user.Email);
         // END DevCyle
+
+        // START OpenFeature
+        OpenFeature.Api.Instance.SetProvider(dcclient.GetOpenFeatureProvider());
+        FeatureClient oFeatClient = OpenFeature.Api.Instance.GetClient();
+        var ofctx = EvaluationContext.Builder()
+            .Set("user_id", user.Email)
+            .Set("Email", user.Email)
+            .Set("Country", user.Country)
+            .Set("Role", user.Role)
+            .Build();
+        // END OpenFeature
 
         // START FlagSmith
         FlagsmithClient fsClient = new(ReadKey("FLAGSMITH_KEY"),
@@ -94,6 +107,18 @@ internal class Program
             var fs_feat = await fsFlags.IsFeatureEnabled(ff_key);
             sw.Stop();
             Console.WriteLine($"retrieved {ff_key} value from FlagSmith in {sw.ElapsedMilliseconds} ms: " + fs_feat);
+
+            // DevCycle
+            sw = Stopwatch.StartNew();
+            bool dc_feat = await dcclient.VariableValue(dcuser, ff_key, false);
+            sw.Stop();
+            Console.WriteLine($"retrieved {ff_key} value from DevCycle in {sw.ElapsedMilliseconds} ms: " + dc_feat);
+
+            // OpenFeature - DevCyle
+             sw = Stopwatch.StartNew();
+            var of_dc_feat = await oFeatClient.GetBooleanValue(ff_key, false, ofctx);
+            sw.Stop();
+            Console.WriteLine($"retrieved {ff_key} value from OpenFeature-DevCycle in {sw.ElapsedMilliseconds} ms: " + of_dc_feat);
 
             // LaunchDarkly
             sw = Stopwatch.StartNew();
